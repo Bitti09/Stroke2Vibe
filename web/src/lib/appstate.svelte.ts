@@ -33,6 +33,19 @@ export const state: AppState = $state({
   generatedAxes: [],
 })
 
+// demo/screenshot hook: pre-arm a connected device state (no real connection)
+if (typeof window !== 'undefined' && (window as never as { __s2v_demoDevice?: boolean }).__s2v_demoDevice) {
+  state.connected = true
+  state.safetyEnabled = true
+  state.deviceInfo = { index: 0, name: 'Demo Device', vibeFeatures: [0, 1] }
+  state.device = {
+    info: { index: 0, name: 'Demo Device', vibeFeatures: [0, 1] },
+    vibrate: async () => {},
+    stop: async () => {},
+    disconnect: async () => {},
+  }
+}
+
 export const options = $state({
   intensity: 1.0,
   rampMs: 60,
