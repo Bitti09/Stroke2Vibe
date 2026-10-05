@@ -1,3 +1,34 @@
+# Stroke2Vibe
+
+![Screenshot](web/docs/screenshot-panels.png)
+
+## Tools
+
+| Tool | Purpose |
+|---|---|
+| `Stroke2Vibe.exe` (this repo, classic) | Interactive stroke → single vibe conversion console |
+| [`auto/`](auto/) | **Stroke2VibeAuto** — standalone, converts a stroke (L0) script into a coherent dual-vibe (V0/V1) script, embedded as a single-file multi-axis funscript |
+| [`web/`](web/) | **Stroke2Vibe Web** — local video player + funscript sync + on-the-fly conversion + Intiface/buttplug.io device control |
+
+## What's new (2026)
+
+Major additions on top of the original console tool — see [`docs/ROADMAP.md`](docs/ROADMAP.md) for details:
+
+- **Stroke2VibeAuto** (`auto/`): fully automatic L0 → V0/V1 conversion (energy-preserving
+  envelope split, motor floor/rate-cap, end-stop), embedded as standard single-file
+  multi-axis funscript; 5 split modes (auto/travel/alternate/layer/surge), in-place with
+  `.bak`, `--split`, `--stats`
+- **Stroke2Vibe Web** (`web/`): Svelte 5 SPA — local video playback with funscript sync,
+  **on-the-fly L0 → V0/V1 conversion** (same pipeline as the C++ reference, parity-tested),
+  trace remapping (any axis → V0/V1 with per-trace conversion modes), auto wave profiles
+  (softer/balanced/stronger/extreme + full manual knob grid: target, gamma, gate, smoothing,
+  floor, baseline, ripple, duty, layer depth/rate, stroke accent, reversal kick, floor ramp,
+  section dynamics), vacuum/suction track generator (incl. pump-pulse mode for devices that
+  can't hold vacuum), waveform display for all traces with zoom/seek/playhead + section
+  overlays, and direct **Intiface Central (buttplug.io)** device control with per-motor
+  power limits, consent switch and kill switch
+- Screenshots: [`web/docs/`](web/docs/) (start view, panels, Intiface panel)
+
 ## Compilation
 Compiling Requires Visual Studio 2019 or newer and vcpkg
 

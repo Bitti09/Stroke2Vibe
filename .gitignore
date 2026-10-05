@@ -35,3 +35,6 @@
 [rR]elease/
 x64/
 *.user
+# node
+node_modules/
+web/dist/
