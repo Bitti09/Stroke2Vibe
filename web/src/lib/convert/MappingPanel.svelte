@@ -47,6 +47,27 @@
   let floorRampMs = $state<number | undefined>(undefined)
   let sections = $state<boolean | undefined>(undefined)
   let manual = $state(false)
+  // context visibility: show only knob groups that affect the chosen modes
+  const modesUsed = $derived.by(() => {
+    const m = new Set<string>()
+    for (const r of rows) if (r.source !== '') m.add(r.mode)
+    return m
+  })
+  // macro: overall strength — moves target/baseline/ripple proportionally; 0 = neutral
+  let strength = $state<number | null>(null)
+  const STRENGTH_TARGET = 85
+  const applyStrength = (v: number) => {
+    strength = v
+    const f = v // -1..+1
+    target = Math.max(40, Math.min(95, Math.round(STRENGTH_TARGET + f * 25)))
+    // baseline: balanced 22% -> softer(quieter) more baseline, extreme less
+    baseline = Math.max(0, Math.min(60, 22 - f * 18)) / 1
+    // normalize to 0..0.6 fraction
+    baseline = Math.max(0, Math.min(0.6, baseline))
+    ripple = Math.max(0, Math.min(0.9, 0.25 + f * 0.25))
+  }
+  const strengthActive = $derived(strength !== null)
+
 
   function resetKnobs() {
     gamma = undefined
@@ -73,6 +94,13 @@
       rows[0].source === rows[1].source &&
       rows[0].mode === rows[1].mode,
   )
+
+  const showSplitKnobs = $derived(
+    modesUsed.has('alternate') || (modesUsed.has('auto') && !coupled) ||
+      (modesUsed.has('auto') && coupled),
+  )
+  const showLayerKnobs = $derived(modesUsed.has('layer') || modesUsed.has('auto'))
+  const showStrokeKnobs = $derived(modesUsed.has('travel') || modesUsed.has('auto') || modesUsed.has('layer') || modesUsed.has('surge'))
 
   let stats = $state<ReturnType<typeof convertMapped> | null>(null)
   let error = $state('')
@@ -237,6 +265,7 @@
       </select>
     </label>
     <button class="mini" onclick={() => (manual = !manual)}>{manual ? 'switch to auto drive' : 'switch to manual'}</button>
+    <button class="mini" onclick={() => applyStrength(0)}>neutralize strength</button>
     {#if manual}
       <button class="mini" onclick={resetKnobs}>reset to auto</button>
     {/if}
@@ -244,6 +273,10 @@
 
   {#if !manual}
     <div class="row shaping">
+      <label>
+        Strength {strength === null ? 'auto' : (strength > 0 ? '+' : '') + Math.round(strength * 100) + '%'}
+        <input type="range" min="-1" max="1" step="0.05" value={strength ?? 0} oninput={(e) => applyStrength((e.currentTarget as HTMLInputElement).valueAsNumber)} />
+      </label>
       <label>
         Target {target ?? (derivedShaping ? derivedShaping.target : 85)}
         <input type="range" min="50" max="95" step="1" value={target ?? 85} oninput={(e) => (target = (e.currentTarget as HTMLInputElement).valueAsNumber)} />
@@ -267,34 +300,63 @@
     </div>
     <p class="info">Auto drive: values derived from the trace (shown live). Touch a slider to pin it — switch profile to reset all.</p>
   {:else}
-    <div class="knobs">
-      <label> Target {target ?? (derivedShaping ? derivedShaping.target : 85)} <input type="range" min="40" max="95" step="1" value={target ?? 85} oninput={(e) => (target = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Gamma {gamma ?? (derivedShaping ? derivedShaping.gamma.toFixed(2) : '0.65')} <input type="range" min="0.3" max="1" step="0.05" value={gamma ?? 0.65} oninput={(e) => (gamma = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Gate {gateP ?? (derivedShaping ? Math.round(derivedShaping.gateP * 100) + '%' : '15%')} <input type="range" min="0" max="0.4" step="0.01" value={gateP ?? 0.15} oninput={(e) => (gateP = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Smooth {smoothMs ?? (derivedShaping ? derivedShaping.smoothMs : 80)} ms <input type="range" min="0" max="500" step="10" value={smoothMs ?? 80} oninput={(e) => (smoothMs = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Floor {floorVal ?? (derivedShaping ? derivedShaping.floorVal : 12)} <input type="range" min="0" max="30" step="1" value={floorVal ?? 12} oninput={(e) => (floorVal = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Min gap {minGapMs ?? 40} ms <input type="range" min="20" max="200" step="5" value={minGapMs ?? 40} oninput={(e) => (minGapMs = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Baseline {baseline ?? (derivedShaping ? Math.round(derivedShaping.baseline * 100) : 22)}% <input type="range" min="0" max="60" step="1" value={(baseline ?? (derivedShaping ? derivedShaping.baseline * 100 : 22))} oninput={(e) => (baseline = (e.currentTarget as HTMLInputElement).valueAsNumber / 100)} /> </label>
-      <label> Ripple {ripple ?? (derivedShaping ? Math.round(derivedShaping.ripple * 100) : 25)}% <input type="range" min="0" max="90" step="5" value={(ripple ?? (derivedShaping ? derivedShaping.ripple * 100 : 25))} oninput={(e) => (ripple = (e.currentTarget as HTMLInputElement).valueAsNumber / 100)} /> </label>
-      <label> Duty (alternate) {duty ?? (derivedShaping ? Math.round(derivedShaping.duty * 100) : 70)}% <input type="range" min="0.5" max="0.95" step="0.01" value={duty ?? 0.7} oninput={(e) => (duty = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Layer depth {layerDepth ?? (derivedShaping ? derivedShaping.layerDepth.toFixed(2) : '0.35')} <input type="range" min="0.05" max="0.9" step="0.05" value={layerDepth ?? 0.35} oninput={(e) => (layerDepth = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Layer rate {layerRatio ?? (derivedShaping ? derivedShaping.layerRatio.toFixed(2) : '0.5')}× <input type="range" min="0.1" max="2" step="0.05" value={layerRatio ?? 0.5} oninput={(e) => (layerRatio = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Stroke accent {accent ?? (derivedShaping ? Math.round(derivedShaping.accent * 100) : 0)}% <input type="range" min="0" max="30" step="1" value={(accent ?? (derivedShaping ? derivedShaping.accent * 100 : 0))} oninput={(e) => (accent = (e.currentTarget as HTMLInputElement).valueAsNumber / 100)} /> </label>
-      <label> Reversal kick {kick ?? (derivedShaping ? derivedShaping.kick.toFixed(1) : '0.0')} <input type="range" min="0" max="1.5" step="0.1" value={kick ?? 0} oninput={(e) => (kick = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label> Floor ramp {floorRampMs ?? 0} ms <input type="range" min="0" max="150" step="10" value={floorRampMs ?? 0} oninput={(e) => (floorRampMs = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
-      <label class="check">
-        Sections
-        <input
-          type="checkbox"
-          checked={sections ?? false}
-          onchange={(e) => {
-            sections = (e.currentTarget as HTMLInputElement).checked
-            options.sectionsEnabled = sections
-          }}
-        />
-      </label>
-    </div>
-    <p class="info">Manual mode: full control. Values shown are the active ones (auto-derived until you touch them).</p>
+    <label class="row shaping" style="align-items:center">
+      Strength {strength === null ? 'neutral' : (strength > 0 ? '+' : '') + Math.round(strength * 100) + '%'}
+      <input type="range" min="-1" max="1" step="0.05" value={strength ?? 0} oninput={(e) => applyStrength((e.currentTarget as HTMLInputElement).valueAsNumber)} />
+      <button class="mini" onclick={() => { strength = null; resetKnobs() }}>reset</button>
+    </label>
+
+    <details open>
+      <summary>Wave shape</summary>
+      <div class="knobs">
+        <label> Target {target ?? (derivedShaping ? derivedShaping.target : 85)} <input type="range" min="40" max="95" step="1" value={target ?? 85} oninput={(e) => (target = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+        <label> Gamma {gamma ?? (derivedShaping ? derivedShaping.gamma.toFixed(2) : '0.65')} <input type="range" min="0.3" max="1" step="0.05" value={gamma ?? 0.65} oninput={(e) => (gamma = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+        <label> Baseline {baseline ?? (derivedShaping ? Math.round(derivedShaping.baseline * 100) : 22)}% <input type="range" min="0" max="60" step="1" value={(baseline ?? (derivedShaping ? derivedShaping.baseline * 100 : 22))} oninput={(e) => (baseline = (e.currentTarget as HTMLInputElement).valueAsNumber / 100)} /> </label>
+        <label> Ripple {ripple ?? (derivedShaping ? Math.round(derivedShaping.ripple * 100) : 25)}% <input type="range" min="0" max="90" step="5" value={(ripple ?? (derivedShaping ? derivedShaping.ripple * 100 : 25))} oninput={(e) => (ripple = (e.currentTarget as HTMLInputElement).valueAsNumber / 100)} /> </label>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Noise &amp; timing</summary>
+      <div class="knobs">
+        <label> Gate {gateP ?? (derivedShaping ? Math.round(derivedShaping.gateP * 100) + '%' : '15%')} <input type="range" min="0" max="0.4" step="0.01" value={gateP ?? 0.15} oninput={(e) => (gateP = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+        <label> Smooth {smoothMs ?? (derivedShaping ? derivedShaping.smoothMs : 80)} ms <input type="range" min="0" max="500" step="10" value={smoothMs ?? 80} oninput={(e) => (smoothMs = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+        <label> Floor {floorVal ?? (derivedShaping ? derivedShaping.floorVal : 12)} <input type="range" min="0" max="30" step="1" value={floorVal ?? 12} oninput={(e) => (floorVal = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+        <label> Floor ramp {floorRampMs ?? 0} ms <input type="range" min="0" max="150" step="10" value={floorRampMs ?? 0} oninput={(e) => (floorRampMs = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+        <label> Min gap {minGapMs ?? 40} ms <input type="range" min="20" max="200" step="5" value={minGapMs ?? 40} oninput={(e) => (minGapMs = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+      </div>
+    </details>
+
+    {#if showSplitKnobs || showLayerKnobs || showStrokeKnobs}
+      <details>
+        <summary>Mode specifics</summary>
+        <div class="knobs">
+          {#if showSplitKnobs}
+            <label> Duty (alternate) {duty ?? (derivedShaping ? Math.round(derivedShaping.duty * 100) : 70)}% <input type="range" min="0.5" max="0.95" step="0.01" value={duty ?? 0.7} oninput={(e) => (duty = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+          {/if}
+          {#if showLayerKnobs}
+            <label> Layer depth {layerDepth ?? (derivedShaping ? derivedShaping.layerDepth.toFixed(2) : '0.35')} <input type="range" min="0.05" max="0.9" step="0.05" value={layerDepth ?? 0.35} oninput={(e) => (layerDepth = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+            <label> Layer rate {layerRatio ?? (derivedShaping ? derivedShaping.layerRatio.toFixed(2) : '0.5')}× <input type="range" min="0.1" max="2" step="0.05" value={layerRatio ?? 0.5} oninput={(e) => (layerRatio = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+          {/if}
+          {#if showStrokeKnobs}
+            <label> Stroke accent {accent ?? (derivedShaping ? Math.round(derivedShaping.accent * 100) : 0)}% <input type="range" min="0" max="30" step="1" value={(accent ?? (derivedShaping ? derivedShaping.accent * 100 : 0))} oninput={(e) => (accent = (e.currentTarget as HTMLInputElement).valueAsNumber / 100)} /> </label>
+            <label> Reversal kick {kick ?? (derivedShaping ? derivedShaping.kick.toFixed(1) : '0.0')} <input type="range" min="0" max="1.5" step="0.1" value={kick ?? 0} oninput={(e) => (kick = (e.currentTarget as HTMLInputElement).valueAsNumber)} /> </label>
+          {/if}
+          <label class="check">
+            Sections
+            <input
+              type="checkbox"
+              checked={sections ?? false}
+              onchange={(e) => {
+                sections = (e.currentTarget as HTMLInputElement).checked
+                options.sectionsEnabled = sections
+              }}
+            />
+          </label>
+        </div>
+      </details>
+    {/if}
+    <p class="info">Manual mode: values shown are the active ones (auto-derived until you touch them). Irrelevant groups are hidden by the current mode selection.</p>
   {/if}
 
   {#if error}

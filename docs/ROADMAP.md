@@ -204,3 +204,13 @@ vergleichbar, nicht nur die aktiven Playback-Achsen. Playhead/Zoom bleibt gemein
   verifiziert: alternate range 15 (balanced) vs 28 (duty 0.9)).
 - baseline/ripple wirken direkt in buildEnvelope (baselineKnob/rippleKnob).
 - Alles auto-applied (Signatur-Guard), kein Apply-Button nötig.
+
+### Nachtrag (2026-10-05): UI-Kontextualisierung (Vorschläge 1–3 umgesetzt)
+- **Kontextsensitive Anzeige:** Manual-Modus zeigt nur noch Knob-Gruppen, die im
+  gewählten Modus wirken (Duty nur bei alternate/auto-PingPong, Layer-*/ bei layer/auto,
+  Accent/Kick bei travel/layer/surge/auto).
+- **Gruppierung:** Manual-Grid in 3 Klappen: „Wave shape" (Target/Gamma/Baseline/Ripple),
+  „Noise & timing" (Gate/Smooth/Floor/Floor-Ramp/MinGap), „Mode specifics" (rest).
+- **Strength-Makro:** ein Regler (-100 %…+100 %), der Target/Baseline/Ripple
+  proportional gemeinsam verschiebt — „etwas leiser/bitte voller" ohne 5 Slider
+  (numerisch verifiziert: Range 32 → 47 → 54 bei -1/0/+1).
