@@ -82,6 +82,12 @@
     }
   }
 
+  function fmtSec(ms: number): string {
+    const s = Math.floor(ms / 1000)
+    const m = Math.floor(s / 60)
+    return `${m}:${String(s % 60).padStart(2, '0')}`
+  }
+
   function colorOf(t: TraceInfo): string {
     const idx = traces.findIndex((x) => x.id === t.id)
     return PALETTE[idx % PALETTE.length]
@@ -92,12 +98,10 @@
   let viewLen = $state<number | null>(null)
   let zoomed = $state(false)
 
-  const t0 = $derived(
-    traces.length ? Math.min(...traces.map((t) => (t.actions.length ? t.actions[0].at : Infinity))) : 0,
-  )
-  const t1 = $derived(
-    traces.length ? Math.max(...traces.map((t) => (t.actions.length ? t.actions[t.actions.length - 1].at : 0)), 1) : 1,
-  )
+  // view spans the whole video (0..duration) when unzoomed, so the playhead position
+  // is always meaningful — leading/trailing silence without actions is shown as such
+  const t0 = $derived(0)
+  const t1 = $derived(Math.max(durationMs, 1))
   const winLenMs = $derived(zoomed && viewLen !== null ? viewLen : Math.max(1, t1 - t0))
   const winStart = $derived(zoomed && viewStart !== null ? viewStart : t0)
   const winEnd = $derived(Math.min(t1, winStart + winLenMs))
@@ -302,6 +306,11 @@
     {/if}
     <div class="playhead" style="left:{playheadPct}%"></div>
   </div>
+  <div class="ruler">
+    <span>0:00</span>
+    <span class="cur">{fmtSec(currentTimeMs)}</span>
+    <span>{fmtSec(durationMs)}</span>
+  </div>
 
   <div class="tools">
     <span class="muted">{(winStart / 1000).toFixed(0)}s – {(winEnd / 1000).toFixed(0)}s</span>
@@ -395,12 +404,37 @@
   }
   .playhead {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: white;
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    top: -2px;
+    bottom: -2px;
+    width: 3px;
+    border-radius: 2px;
+    background: #ff3b30;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.6),
+      0 0 8px rgba(255, 255, 255, 0.9);
     pointer-events: none;
+    z-index: 5;
+  }
+  .playhead::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -4px;
+    border: 5px solid transparent;
+    border-top-color: #ff3b30;
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+  }
+  .ruler {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+  .ruler .cur {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
   .tools {
     display: flex;
