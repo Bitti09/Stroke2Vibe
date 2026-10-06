@@ -11,10 +11,48 @@
   let videoEl = $state<HTMLVideoElement | undefined>(undefined)
   let fileInput = $state<HTMLInputElement | undefined>()
   let dragOver = $state(false)
+  // media state mirrors: HTMLMediaElement.currentTime is NOT reactive — these are
+  // updated by a rAF loop (playing) plus events (seek/pause/metadata) so all
+  // derived UI (waveform playhead, ruler, heatmap) tracks the video smoothly.
+  let currentTimeMs = $state(0)
+  let durationMs = $state(0)
+  let playing = $state(false)
 
-  const duration = $derived(videoEl?.duration ?? 0)
-  const currentTime = $derived(videoEl?.currentTime ?? 0)
-  const playing = $derived(videoEl ? !videoEl.paused : false)
+  const duration = $derived(durationMs / 1000)
+  const currentTime = $derived(currentTimeMs / 1000)
+
+  $effect(() => {
+    const v = videoEl
+    if (!v) return
+    const sync = () => {
+      currentTimeMs = v.currentTime * 1000
+      durationMs = Number.isFinite(v.duration) ? v.duration * 1000 : 0
+      playing = !v.paused && !v.ended
+    }
+    sync()
+    v.addEventListener('loadedmetadata', sync)
+    v.addEventListener('play', sync)
+    v.addEventListener('pause', sync)
+    v.addEventListener('seeked', sync)
+    v.addEventListener('ended', sync)
+    v.addEventListener('timeupdate', sync)
+    let raf = 0
+    const rafLoop = () => {
+      currentTimeMs = v.currentTime * 1000
+      playing = !v.paused && !v.ended
+      raf = requestAnimationFrame(rafLoop)
+    }
+    raf = requestAnimationFrame(rafLoop)
+    return () => {
+      cancelAnimationFrame(raf)
+      v.removeEventListener('loadedmetadata', sync)
+      v.removeEventListener('play', sync)
+      v.removeEventListener('pause', sync)
+      v.removeEventListener('seeked', sync)
+      v.removeEventListener('ended', sync)
+      v.removeEventListener('timeupdate', sync)
+    }
+  })
 
 
   function loadVideo(file: File) {
