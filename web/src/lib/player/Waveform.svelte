@@ -83,6 +83,7 @@
   }
 
   function fmtSec(ms: number): string {
+    if (!Number.isFinite(ms)) return '0:00'
     const s = Math.floor(ms / 1000)
     const m = Math.floor(s / 60)
     return `${m}:${String(s % 60).padStart(2, '0')}`
@@ -98,10 +99,17 @@
   let viewLen = $state<number | null>(null)
   let zoomed = $state(false)
 
-  // view spans the whole video (0..duration) when unzoomed, so the playhead position
-  // is always meaningful — leading/trailing silence without actions is shown as such
+  // view spans the whole video (0..duration) when unzoomed. If the video duration is
+  // not known yet (NaN before metadata loads), fall back to the last action time so
+  // the waveform renders immediately instead of NaN-ing out.
   const t0 = $derived(0)
-  const t1 = $derived(Math.max(durationMs, 1))
+  const lastActionMs = $derived(
+    traces.length ? Math.max(...traces.map((t) => (t.actions.length ? t.actions[t.actions.length - 1].at : 0)), 0) : 0,
+  )
+  const durationSafe = $derived(
+    Number.isFinite(durationMs) && durationMs > 0 ? durationMs : lastActionMs + 5000,
+  )
+  const t1 = $derived(Math.max(durationSafe, 1))
   const winLenMs = $derived(zoomed && viewLen !== null ? viewLen : Math.max(1, t1 - t0))
   const winStart = $derived(zoomed && viewStart !== null ? viewStart : t0)
   const winEnd = $derived(Math.min(t1, winStart + winLenMs))
