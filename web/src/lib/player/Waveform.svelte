@@ -42,32 +42,28 @@
     visible: boolean
     mode: ViewMode
   }
-  // visibility/view state per trace id
+  // visibility/view state per trace id — NEVER written inside deriveds/templates:
+  // stateOf is a pure read (missing entry = default), mutations happen only in handlers
   let laneState = $state<Record<string, LaneState>>({})
 
-  function defaultState(t: TraceInfo): LaneState {
-    if (activeIds.map((a) => a.toLowerCase()).includes(t.id.toLowerCase())) return { visible: true, mode: 'pos' }
-    return { visible: false, mode: 'pos' }
-  }
   function stateOf(t: TraceInfo): LaneState {
-    if (!laneState[t.id]) laneState[t.id] = defaultState(t)
-    return laneState[t.id]
+    const s = laneState[t.id]
+    if (s) return s
+    const isPlayback = activeIds.map((a) => a.toLowerCase()).includes(t.id.toLowerCase())
+    return isPlayback ? { visible: true, mode: 'pos' } : { visible: false, mode: 'pos' }
   }
   function toggle(t: TraceInfo) {
     const s = { ...stateOf(t), visible: !stateOf(t).visible }
     laneState[t.id] = s
-    lanes = [...lanes]
   }
   function solo(t: TraceInfo) {
     const on = stateOf(t).visible
     for (const tr of traces) laneState[tr.id] = { ...stateOf(tr), visible: false }
     laneState[t.id] = { ...stateOf(t), visible: !on }
-    lanes = [...lanes]
   }
   function cycleMode(t: TraceInfo) {
     const s = stateOf(t)
     laneState[t.id] = { ...s, mode: s.mode === 'pos' ? 'speed' : 'pos' }
-    lanes = [...lanes]
   }
 
   // lanes list: visible traces, playback axes first (already ordered by caller)
